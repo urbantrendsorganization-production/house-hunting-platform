@@ -1,0 +1,105 @@
+name: keja
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: keja
+      POSTGRES_USER: keja
+      POSTGRES_PASSWORD: keja
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      # Host port offset to avoid clashing with other local UrbanTrends stacks.
+      # Container-internal port stays 5432 (service DNS `db:5432` unaffected).
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keja -d keja"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio12345
+    volumes:
+      - miniodata:/data
+    ports:
+      - "9010:9000"
+      - "9011:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Creates the media bucket on startup, then exits.
+  minio-setup:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minio minio12345 &&
+      mc mb --ignore-existing local/keja-media &&
+      echo 'bucket ready';
+      "
+
+  api:
+    build:
+      context: ./api
+    command: >
+      /bin/sh -c "
+      python manage.py migrate --noinput &&
+      python manage.py runserver 0.0.0.0:8000
+      "
+    environment:
+      DEBUG: "true"
+      DJANGO_SECRET_KEY: dev-insecure-change-me
+      DATABASE_URL: postgis://keja:keja@db:5432/keja
+      REDIS_URL: redis://redis:6379/0
+      AWS_S3_ENDPOINT_URL: http://minio:9000
+    volumes:
+      - ./api:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ./api
+    command: celery -A keja worker -l info
+    environment:
+      DEBUG: "true"
+      DJANGO_SECRET_KEY: dev-insecure-change-me
+      DATABASE_URL: postgis://keja:keja@db:5432/keja
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./api:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  miniodata:
