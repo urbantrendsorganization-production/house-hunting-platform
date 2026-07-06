@@ -71,6 +71,18 @@ def count_active_in_bbox(w, s, e, n) -> int:
     return Building.objects.filter(has_active_vacancy=True, location__intersects=poly).count()
 
 
+def active_buildings_in_estate(slug: str, *, limit=None):
+    """Active-vacancy buildings in an estate, freshest first — for SSR SEO pages."""
+    limit = limit or settings.MAP_MAX_MARKERS
+    qs = (
+        Building.objects.filter(estate__slug=slug, has_active_vacancy=True)
+        .select_related("estate")
+        .prefetch_related("unit_types")
+        .order_by("is_demoted", "-latest_verified_at")
+    )
+    return list(qs[:limit])
+
+
 def buildings_near(lng: float, lat: float, radius_km: float, *, limit=None):
     """Radius / 'near me' query, distance-sorted (rides the GiST index)."""
     limit = limit or settings.MAP_MAX_MARKERS

@@ -51,6 +51,37 @@ class BuildingMarkerSerializer(serializers.ModelSerializer):
         return _verified_days_ago(obj)
 
 
+class BuildingListSerializer(BuildingMarkerSerializer):
+    """Building summary for estate listing pages: adds price + unit kinds."""
+
+    min_rent_kes = serializers.SerializerMethodField()
+    unit_kinds = serializers.SerializerMethodField()
+
+    class Meta(BuildingMarkerSerializer.Meta):
+        fields = BuildingMarkerSerializer.Meta.fields + ["min_rent_kes", "unit_kinds"]
+
+    def get_min_rent_kes(self, obj):
+        rents = [ut.rent_kes for ut in obj.unit_types.all()]
+        return min(rents) if rents else None
+
+    def get_unit_kinds(self, obj):
+        return sorted({ut.kind for ut in obj.unit_types.all()})
+
+
+class EstateSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    slug = serializers.CharField()
+    lng = serializers.SerializerMethodField()
+    lat = serializers.SerializerMethodField()
+    active_building_count = serializers.IntegerField(read_only=True)
+
+    def get_lng(self, obj):
+        return obj.centroid.x
+
+    def get_lat(self, obj):
+        return obj.centroid.y
+
+
 class BuildingDetailSerializer(BuildingMarkerSerializer):
     """Full detail for the bottom sheet / building page."""
 

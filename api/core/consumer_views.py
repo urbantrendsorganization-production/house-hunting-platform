@@ -8,6 +8,7 @@ import hashlib
 
 from django.conf import settings
 from django.core.cache import cache
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -15,8 +16,13 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
-from core.consumer_serializers import BuildingDetailSerializer, BuildingMarkerSerializer
-from core.models import Building
+from core.consumer_serializers import (
+    BuildingDetailSerializer,
+    BuildingListSerializer,
+    BuildingMarkerSerializer,
+    EstateSerializer,
+)
+from core.models import Building, Estate
 from core.services import map_queries
 from core.services.map_queries import BboxTooLarge
 
@@ -99,6 +105,31 @@ def near_me(request):
     for item, b in zip(data, buildings, strict=False):
         item["distance_m"] = round(b.dist.m)
     return Response({"count": len(data), "results": data})
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def estate_list(request):
+    """All estates with their active-vacancy counts — homepage / SEO index."""
+    estates = Estate.objects.annotate(
+        active_building_count=Count("buildings", filter=Q(buildings__has_active_vacancy=True))
+    ).order_by("-active_building_count", "name")
+    return Response({"results": EstateSerializer(estates, many=True).data})
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def estate_detail(request, slug):
+    """Estate + its active-vacancy buildings, freshest first (SSR SEO page)."""
+    estate = get_object_or_404(Estate, slug=slug)
+    buildings = map_queries.active_buildings_in_estate(slug)
+    estate.active_building_count = len(buildings)
+    return Response(
+        {
+            "estate": EstateSerializer(estate).data,
+            "buildings": BuildingListSerializer(buildings, many=True).data,
+        }
+    )
 
 
 @api_view(["GET"])
