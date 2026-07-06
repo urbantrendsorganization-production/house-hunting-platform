@@ -45,22 +45,39 @@ clusters kick in when zoomed out; live smoke over seeded data.
 > Note: the gate's *p95 latency on staging hardware* target is a measurement to take on
 > real staging, not something reproducible in this dev container.
 
+## 🟡 Phase 5 — Website (Next.js) — **built, SSR gate verified**
+
+- Next.js 15 App Router, TypeScript strict, server components by default.
+- Homepage (estates + live counts), **SSR/SSG estate pages** at
+  `/vacant-houses/[estate]` with ItemList JSON-LD and verified-age badges, building
+  detail with a Google Maps directions deep-link, and a viewport-driven `/map`
+  (debounced refetch, server-side clusters) that degrades to a list without a Maps key.
+- `robots.txt` + `sitemap.xml` (estate URLs).
+- Backend support: `GET /estates/` and `/estates/<slug>/` (tested).
+
+**Verified:** `npm run typecheck` + `npm run build` pass; estate/building content
+renders in raw server HTML (JS-disabled equivalent) against the live API; JSON-LD and
+sitemap present.
+
+**Remaining (human/measurement gates):** Lighthouse ≥ 90 on real hosting; the
+"5 strangers find a house" usability test; a real Google Maps JS API key for the map.
+
 ## ⏳ Remaining phases — need human / device / infra involvement
 
-These are scaffolded (directory + README) but not built here, because their gates
-require things outside an automated backend build:
+Scaffolded (directory + README) but not built here — their gates require things
+outside an automated build:
 
 - **Phase 2 — Agent app (Flutter):** gate is "capture a building in airplane mode, sync
   with zero data loss" and "capture a whole pilot estate by hand" — needs a real device
   and field work. The API it targets (`/agent/sync`, presign) is done and live.
 - **Phase 4 — Consumer app (Flutter):** gate needs a mid-range Android device + 5 real
   house-hunter testers. Consumes the finished map API.
-- **Phase 5 — Website (Next.js):** buildable next; gate needs SSR verification + Lighthouse.
 - **Phase 6 — Back office / QA:** Django admin is already hardened (append-only snapshots,
   read-only vacancy history). Duplicate-merge tooling + dashboards remain.
 - **Phase 7 — Prod hardening:** needs Hetzner/Tailscale access, real domains, backups.
 
 ## Suggested next step
 
-Build **Phase 5 (web)** — it's the next fully code-buildable surface and gives a real
-end-to-end user-facing experience on top of the finished map API.
+**Phase 6 (back office)** is the next fully code-buildable surface — duplicate-building
+detection (spatial proximity + name similarity), a capture-review queue, and staleness
+dashboards on top of the hardened admin.
