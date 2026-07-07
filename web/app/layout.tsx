@@ -26,6 +26,7 @@ export default function RootLayout({
             </Link>
             <nav className="nav">
               <Link href="/map">Map</Link>
+              <Link href="/download">Get the app</Link>
             </nav>
           </div>
         </header>
