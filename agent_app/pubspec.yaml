@@ -1,0 +1,47 @@
+name: agent_app
+description: "Keja field agent capture app (offline-first)"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State — Riverpod (CLAUDE.md: Riverpod for state, repository pattern).
+  flutter_riverpod: ^2.6.1
+
+  # Local db — Drift is the offline source of truth for the capture queue.
+  drift: ^2.20.0
+  sqlite3_flutter_libs: ^0.5.24
+  path_provider: ^2.1.4
+  path: ^1.9.0
+
+  # API client + connectivity for the sync worker.
+  dio: ^5.7.0
+  connectivity_plus: ^6.0.5
+
+  # Field capture: GPS pin, photos + client-side compression.
+  geolocator: ^13.0.1
+  image_picker: ^1.1.2
+  flutter_image_compress: ^2.3.0
+
+  # Secure token storage + client-generated idempotency keys.
+  flutter_secure_storage: ^9.2.2
+  uuid: ^4.5.1
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+  # Drift codegen.
+  drift_dev: ^2.20.0
+  build_runner: ^2.4.13
+
+flutter:
+  uses-material-design: true

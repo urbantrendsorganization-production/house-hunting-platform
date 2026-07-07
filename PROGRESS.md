@@ -110,16 +110,44 @@ errors. Full suite green (47), ruff + black clean.
 two estates live with < 10% listings older than 7 days; a non-founder agent
 captures with zero hand-holding; measured p95 / 50x load on staging hardware.
 
-## ⏳ Remaining phases — need human / device involvement
+## 🟡 Phase 2 — Agent app (Flutter, offline-first) — **built, analyzer + unit tests green**
 
-- **Phase 2 — Agent app (Flutter):** gate is "capture a building in airplane mode, sync
-  with zero data loss" and "capture a whole pilot estate by hand" — needs a real device
-  and field work. The API it targets (`/agent/sync`, presign) is done and live.
-- **Phase 4 — Consumer app (Flutter):** gate needs a mid-range Android device + 5 real
-  house-hunter testers. Consumes the finished map API.
+- Riverpod + repository pattern over a **Drift local db (the offline source of
+  truth)** and a Dio API client (CLAUDE.md stack).
+- Device-bound phone login; capture flow with a **GPS accuracy gate** (pin locked
+  until ≤ 15m, accepted fix frozen); building + unit-type + vacancy + photo forms;
+  client-side photo compression.
+- **Idempotent sync worker**: uploads photo bytes to object storage first (bytes
+  never touch the API), then POSTs a dependency-ordered `client_uuid` batch to
+  `/agent/sync/`; connectivity-driven, retries converge with zero duplicates.
+- "My buildings" list with live per-record sync status + a **2-tap re-verify**
+  sheet (the daily loop).
+
+**Verified:** `flutter analyze` clean; unit tests prove capture queues as pending,
+re-verify is append-only, and synced records leave the queue.
+**Remaining (device/field gates):** airplane-mode capture→reconnect on a real
+device; hand-capture a whole pilot estate.
+
+## 🟡 Phase 4 — Consumer app (Flutter) — **built, analyzer + unit tests green**
+
+- Riverpod; **Google Maps SDK** with markers + **server-side clusters** from the
+  viewport API, debounced pan refetch, "near me" via fused location.
+- Tap → bottom sheet: unit types + prices, **"Verified X days ago"** badge,
+  Google Maps **directions deep-link**, interest/lead stub (endpoint deferred).
+- KE-restricted **Places autocomplete** (session tokens, ≥300ms debounce);
+  freshness/quality filters; a **list-view fallback** for no-key / low-end devices.
+
+**Verified:** `flutter analyze` clean; unit tests cover both viewport modes,
+building-detail parsing, and the freshness filter.
+**Remaining (device/field gates):** cold-open < 5s on a mid-range Android; the
+"5 strangers find a house" test; pan/zoom feel on a Tecno/Infinix-class phone.
+
+> Note: price / unit-type filtering needs a small backend follow-up (denormalized
+> `min_rent` / `unit_kinds` on the viewport payload); current filters use the
+> verification age + demoted flag the marker payload already carries.
 
 ## Suggested next step
 
-The backend is feature-complete through Phase 7. The remaining gates are the two
-**Flutter apps** (Phases 2 & 4) — device + field work — and the live pilot
-(deploy, onboard a real agent, hit two estates). No further server code is blocked.
+All seven phases are code-complete. What's left is **field + infra**: deploy on
+Hetzner, put both apps on real devices, hand-capture a pilot estate, and run the
+two "5 strangers / non-founder agent" gates. No further build work is blocked.
