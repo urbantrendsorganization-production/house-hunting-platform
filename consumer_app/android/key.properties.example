@@ -1,0 +1,14 @@
+# Copy to android/key.properties on the RELEASE build machine and fill with real
+# values. This file (key.properties) and the keystore are git-ignored — NEVER
+# commit them. Losing the keystore means you can never update the app again, so
+# back it up somewhere safe (password manager / secrets vault).
+#
+# Create the keystore once:
+#   keytool -genkey -v -keystore ~/keja-upload.jks -keyalg RSA -keysize 2048 \
+#           -validity 10000 -alias keja
+#
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=keja
+# Absolute path to the .jks, or relative to android/app/ :
+storeFile=/absolute/path/to/keja-upload.jks

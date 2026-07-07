@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+staticfiles/
+
+# Env / secrets
+.env
+*.env
+!.env.example
+
+# Node / web
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Flutter
+.dart_tool/
+build/
+.flutter-plugins*
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/

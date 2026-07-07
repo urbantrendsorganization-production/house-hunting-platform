@@ -1,0 +1,108 @@
+# Production stack for Keja — Hetzner, behind Caddy (Phase 7).
+#
+#   cd ops/compose
+#   cp ../env/prod.env.example .env   # fill in real secrets — never commit .env
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Differences from the root dev compose:
+#   * API/worker run the published GHCR image (no local build, no code mount).
+#   * gunicorn (not runserver); a dedicated celery-beat service owns the schedule.
+#   * Caddy terminates TLS and reverse-proxies api + web.
+#   * No host DB/redis ports exposed — only Caddy's 80/443 face the internet.
+#   * restart: unless-stopped everywhere so the box self-heals on reboot.
+name: keja-prod
+
+x-api-env: &api-env
+  DEBUG: "false"
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set in .env}
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:?set in .env}
+  CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
+  DATABASE_URL: postgis://keja:${POSTGRES_PASSWORD:?set in .env}@db:5432/keja
+  REDIS_URL: redis://redis:6379/0
+  AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+  AWS_STORAGE_BUCKET_NAME: ${AWS_STORAGE_BUCKET_NAME:-keja-media}
+  SENTRY_DSN: ${SENTRY_DSN:-}
+  SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: keja
+      POSTGRES_USER: keja
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    volumes:
+      - /srv/keja/pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keja -d keja"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - /srv/keja/redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    image: ${API_IMAGE:-ghcr.io/urbantrendsorganization-production/house-hunting-platform/api:latest}
+    command: >
+      /bin/sh -c "
+      python manage.py migrate --noinput &&
+      python manage.py collectstatic --noinput &&
+      gunicorn keja.wsgi:application --bind 0.0.0.0:8000 --workers 3 --access-logfile -
+      "
+    environment: *api-env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    image: ${API_IMAGE:-ghcr.io/urbantrendsorganization-production/house-hunting-platform/api:latest}
+    command: celery -A keja worker -l info
+    environment: *api-env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  beat:
+    image: ${API_IMAGE:-ghcr.io/urbantrendsorganization-production/house-hunting-platform/api:latest}
+    # The hourly staleness sweep lives here — exactly one beat scheduler.
+    command: celery -A keja beat -l info
+    environment: *api-env
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - /srv/keja/caddy/data:/data
+      - /srv/keja/caddy/config:/config
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?set in .env}
+      WEB_DOMAIN: ${WEB_DOMAIN:?set in .env}
+      WEB_UPSTREAM: ${WEB_UPSTREAM:-web:3000}
+    depends_on:
+      - api
+    restart: unless-stopped

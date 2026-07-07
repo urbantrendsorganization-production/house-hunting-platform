@@ -1,0 +1,29 @@
+# Keja reverse proxy (Phase 7). Caddy fetches + renews TLS certs automatically.
+# Domains are injected from the compose env (API_DOMAIN / WEB_DOMAIN).
+
+# API — Django/gunicorn. Caddy sets X-Forwarded-Proto so Django's
+# SECURE_PROXY_SSL_HEADER sees the original https scheme.
+{$API_DOMAIN} {
+	encode gzip zstd
+
+	# Cheap liveness probe for uptime monitors — no app round-trip needed.
+	handle /healthz {
+		respond "ok" 200
+	}
+
+	reverse_proxy api:8000
+
+	log {
+		output file /data/access-api.log
+	}
+}
+
+# Website — Next.js (Phase 5). Upstream defaults to the `web` service.
+{$WEB_DOMAIN} {
+	encode gzip zstd
+	reverse_proxy {$WEB_UPSTREAM}
+
+	log {
+		output file /data/access-web.log
+	}
+}
