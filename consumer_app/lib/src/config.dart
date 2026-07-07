@@ -19,6 +19,11 @@ class AppConfig {
   static const double defaultLat = -1.2864;
   static const double defaultLng = 36.8172;
 
+  /// Radius for the "near me" query and the keyless list fallback (no Maps key
+  /// / no map controller — we can't read a viewport bbox, so we query a radius
+  /// around the camera target instead).
+  static const double nearMeRadiusKm = 5;
+
   /// Below this zoom the server sends clusters, above it raw markers — mirrors
   /// MAP_CLUSTER_ZOOM_THRESHOLD in the API.
   static const double clusterZoomThreshold = 15;

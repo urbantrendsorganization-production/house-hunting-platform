@@ -9,11 +9,11 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
-        <!-- Google Maps SDK key. Supply at build:
-             flutter run --dart-define was not enough for the native SDK, so the
-             key is read from the manifest placeholder MAPS_API_KEY (set in
-             android/local.properties or gradle). Empty key => map tiles won't
-             load but the app still runs (list fallback). -->
+        <!-- Google Maps SDK key. Supply at build time: a Dart define is not
+             enough for the native SDK, so the key is read from the manifest
+             placeholder MAPS_API_KEY (set in android/local.properties or
+             gradle). Empty key => map tiles won't load but the app still runs
+             (list fallback). -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}"/>

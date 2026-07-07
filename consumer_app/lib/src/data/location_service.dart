@@ -16,8 +16,18 @@ class LocationService {
 
   Future<Position?> currentPosition() async {
     if (!await ensurePermission()) return null;
-    return Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-    );
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          // Never block the "Bolt moment" forever: a cold GPS (common on
+          // emulators / indoors) would otherwise hang this future. On timeout
+          // we fall through to the last known fix, then the default camera.
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+    } catch (_) {
+      return Geolocator.getLastKnownPosition();
+    }
   }
 }

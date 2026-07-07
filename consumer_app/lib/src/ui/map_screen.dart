@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../config.dart';
@@ -50,14 +51,24 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   Future<void> _goToUser() async {
-    final pos = await ref.read(locationServiceProvider).currentPosition();
+    Position? pos;
+    try {
+      pos = await ref.read(locationServiceProvider).currentPosition();
+    } catch (_) {
+      pos = null;
+    }
     if (pos == null) {
-      _refetch(); // no permission — just load the default camera area
+      _refetch(); // no permission/fix — just load the default camera area
       return;
     }
     final target = LatLng(pos.latitude, pos.longitude);
     _camera = CameraPosition(target: target, zoom: 16);
-    await _controller?.animateCamera(CameraUpdate.newCameraPosition(_camera));
+    try {
+      await _controller?.animateCamera(CameraUpdate.newCameraPosition(_camera));
+    } catch (_) {
+      // Controller may be disposed (list view) — the camera target is already
+      // updated, so _refetch still queries the right place.
+    }
     _refetch();
   }
 
@@ -67,32 +78,44 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   Future<void> _refetch() async {
-    final controller = _controller;
-    if (controller == null) return;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final bounds = await controller.getVisibleRegion();
-      final zoom = _camera.zoom.round();
-      final result = await ref.read(apiClientProvider).viewport(
-            w: bounds.southwest.longitude,
-            s: bounds.southwest.latitude,
-            e: bounds.northeast.longitude,
-            n: bounds.northeast.latitude,
-            zoom: zoom,
-          );
-      _applyResult(result);
+      final controller = _controller;
+      if (controller != null && !_listView) {
+        final bounds = await controller.getVisibleRegion();
+        final zoom = _camera.zoom.round();
+        final result = await ref.read(apiClientProvider).viewport(
+              w: bounds.southwest.longitude,
+              s: bounds.southwest.latitude,
+              e: bounds.northeast.longitude,
+              n: bounds.northeast.latitude,
+              zoom: zoom,
+            );
+        _applyResult(result);
+      } else {
+        // No map controller yet (no Maps key, or list-only view) — we can't
+        // read a viewport bbox, so fall back to a radius query around the
+        // current camera target. Keeps the list usable per the
+        // graceful-degradation rule (CLAUDE.md).
+        final target = _camera.target;
+        final markers = await ref.read(apiClientProvider).nearMe(
+              lat: target.latitude,
+              lng: target.longitude,
+              radiusKm: AppConfig.nearMeRadiusKm,
+            );
+        _applyMarkers(markers);
+      }
     } catch (e) {
-      setState(() => _error = 'Could not load the map. Check your connection.');
+      setState(() => _error = 'Could not load listings. Check your connection.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
   void _applyResult(ViewportResult result) {
-    final filters = ref.read(mapFiltersProvider);
     final markers = <Marker>{};
 
     if (result.isClusters) {
@@ -106,23 +129,32 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         ));
       }
       _lastMarkers = const [];
+      setState(() => _markers = markers);
     } else {
-      final visible = result.markers.where(filters.allows).toList();
-      _lastMarkers = visible;
-      for (final b in visible) {
-        markers.add(Marker(
-          markerId: MarkerId(b.id),
-          position: LatLng(b.lat, b.lng),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            b.isDemoted ? BitmapDescriptor.hueOrange : BitmapDescriptor.hueGreen,
-          ),
-          infoWindow: InfoWindow(
-            title: b.name.isEmpty ? b.estate : b.name,
-            snippet: _freshness(b.verifiedDaysAgo),
-          ),
-          onTap: () => _openBuilding(b.id),
-        ));
-      }
+      _applyMarkers(result.markers);
+    }
+  }
+
+  /// Build pins + the list-view backing data from a flat marker list. Shared by
+  /// the viewport path and the keyless near-me fallback.
+  void _applyMarkers(List<BuildingMarker> raw) {
+    final filters = ref.read(mapFiltersProvider);
+    final visible = raw.where(filters.allows).toList();
+    _lastMarkers = visible;
+    final markers = <Marker>{};
+    for (final b in visible) {
+      markers.add(Marker(
+        markerId: MarkerId(b.id),
+        position: LatLng(b.lat, b.lng),
+        icon: BitmapDescriptor.defaultMarkerWithHue(
+          b.isDemoted ? BitmapDescriptor.hueOrange : BitmapDescriptor.hueGreen,
+        ),
+        infoWindow: InfoWindow(
+          title: b.name.isEmpty ? b.estate : b.name,
+          snippet: _freshness(b.verifiedDaysAgo),
+        ),
+        onTap: () => _openBuilding(b.id),
+      ));
     }
     setState(() => _markers = markers);
   }
@@ -235,7 +267,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         children: [
           FloatingActionButton.small(
             heroTag: 'list',
-            onPressed: () => setState(() => _listView = !_listView),
+            onPressed: () {
+              setState(() {
+                _listView = !_listView;
+                // The GoogleMap widget is torn down when we show the list, so
+                // its controller becomes stale — drop it and let _refetch use
+                // the near-me fallback instead of a disposed controller.
+                if (_listView) _controller = null;
+              });
+              if (_listView) _refetch();
+            },
             child: Icon(_listView ? Icons.map : Icons.list),
           ),
           const SizedBox(height: 12),
