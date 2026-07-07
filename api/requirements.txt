@@ -16,3 +16,6 @@ PyJWT==2.10.1
 
 # Serving
 gunicorn==23.0.0
+
+# Error monitoring (optional — only initialised when SENTRY_DSN is set)
+sentry-sdk==2.19.2

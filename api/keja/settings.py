@@ -135,3 +135,62 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # --- Freshness rules (CLAUDE.md) ---
 VACANCY_DEMOTE_DAYS = env.int("VACANCY_DEMOTE_DAYS", default=14)
 VACANCY_HIDE_DAYS = env.int("VACANCY_HIDE_DAYS", default=30)
+
+# --- Production hardening (Phase 7) ---
+# Behind Caddy, TLS terminates at the proxy and requests arrive over HTTP with
+# X-Forwarded-Proto set — trust it so Django knows the original scheme.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+if not DEBUG:
+    # These only bite in real deployments; local dev (DEBUG=true) is unaffected.
+    SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=60 * 60 * 24 * 30)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    # Caddy needs the API's public origin(s) for CSRF on the admin/back office.
+    CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+
+# Requests slower than this (ms) are logged as a slow-query warning. 0 disables.
+SLOW_REQUEST_MS = env.int("SLOW_REQUEST_MS", default=500)
+MIDDLEWARE.insert(0, "core.middleware.SlowRequestLoggerMiddleware")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "verbose"},
+    },
+    "root": {"handlers": ["console"], "level": env("LOG_LEVEL", default="INFO")},
+    "loggers": {
+        # Slow requests + optional SQL logging for pilot-scale profiling.
+        "keja.slow": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+        "django.db.backends": {
+            "handlers": ["console"],
+            "level": env("DB_LOG_LEVEL", default="WARNING"),
+            "propagate": False,
+        },
+    },
+}
+
+# --- Error monitoring (Sentry / self-hosted GlitchTip) ---
+# Fully optional: with no DSN the SDK is never imported, so it's a no-op locally
+# and in CI. Point SENTRY_DSN at Sentry or a self-hosted GlitchTip in prod.
+SENTRY_DSN = env("SENTRY_DSN", default="")
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration(), CeleryIntegration()],
+        environment=env("SENTRY_ENVIRONMENT", default="production"),
+        traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.0),
+        send_default_pii=False,
+    )

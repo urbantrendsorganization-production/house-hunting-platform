@@ -85,19 +85,41 @@ sitemap present.
 dashboard ranks the stalest estate first and flags hidden listings; leaderboard counts
 captures; back-office endpoints reject anonymous + non-staff callers. Full suite green.
 
-## ⏳ Remaining phases — need human / device / infra involvement
+## 🟡 Phase 7 — Pilot hardening & scale-out — **infra built, restore gate met**
 
-Scaffolded (directory + README) but not built here — their gates require things
-outside an automated build:
+Everything code-buildable for prod is done; what remains is field/infra work.
+
+- **Prod deploy** (`ops/compose/docker-compose.prod.yml` + `ops/caddy/Caddyfile`):
+  GHCR image, gunicorn, a dedicated celery-beat (the hourly sweep), Caddy TLS
+  termination, DB/Redis off the public network, state under `/srv/keja`.
+- **Backups** (`ops/backup/`): `pg_dump` (custom format) + optional object-storage
+  mirror with retention; `restore.sh` drops/recreates and smoke-checks PostGIS.
+- **Monitoring:** env-gated Sentry/GlitchTip (no-op when unset), a
+  `SlowRequestLoggerMiddleware` (>`SLOW_REQUEST_MS` → `keja.slow`), optional SQL
+  logging, and production security settings (HSTS, secure cookies, SSL redirect,
+  proxy SSL header for Caddy). Caddy `/healthz` for uptime probes.
+- **Load test** (`ops/loadtest/`): stdlib viewport harness (p50/p95/p99, status
+  buckets) + a k6 ramp script for the "50x pilot traffic" gate.
+
+**Verified:** backup → restore **rehearsed against a live db** — dump taken, db
+dropped/recreated, restored, PostGIS 3.4.3 and all 20 buildings back (restore
+gate met). Load harness runs and cleanly separates 429-throttle from server
+errors. Full suite green (47), ruff + black clean.
+
+**Remaining (human / field / infra gates):** deploy on real Hetzner + domains;
+two estates live with < 10% listings older than 7 days; a non-founder agent
+captures with zero hand-holding; measured p95 / 50x load on staging hardware.
+
+## ⏳ Remaining phases — need human / device involvement
 
 - **Phase 2 — Agent app (Flutter):** gate is "capture a building in airplane mode, sync
   with zero data loss" and "capture a whole pilot estate by hand" — needs a real device
   and field work. The API it targets (`/agent/sync`, presign) is done and live.
 - **Phase 4 — Consumer app (Flutter):** gate needs a mid-range Android device + 5 real
   house-hunter testers. Consumes the finished map API.
-- **Phase 7 — Prod hardening:** needs Hetzner/Tailscale access, real domains, backups.
 
 ## Suggested next step
 
-**Phase 7 (prod hardening)** — deploy to Hetzner behind Caddy, backups, monitoring, and
-onboard the first real field agent. Needs infra access, not more application code.
+The backend is feature-complete through Phase 7. The remaining gates are the two
+**Flutter apps** (Phases 2 & 4) — device + field work — and the live pilot
+(deploy, onboard a real agent, hit two estates). No further server code is blocked.
