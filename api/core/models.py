@@ -8,6 +8,7 @@ that must never be violated — notably: snapshots are never UPDATEd, and
 
 import uuid
 
+from django.conf import settings
 from django.contrib.gis.db import models as gis_models
 from django.db import models
 
@@ -81,6 +82,19 @@ class Building(TimestampedModel):
     # Age of the freshest snapshot across this building's unit types. Denormalized
     # so consumer surfaces render "verified X days ago" without a snapshot join.
     latest_verified_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    # Back-office capture review (Phase 6). A freshly captured building is
+    # unreviewed (reviewed_at is NULL) and appears in the QA review queue until a
+    # staff member signs off. Review never gates consumer visibility — that is
+    # freshness's job — it is a data-quality trail, not a publish switch.
+    reviewed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_buildings",
+    )
 
     class Meta:
         ordering = ["-created_at"]
@@ -160,6 +174,9 @@ class BuildingPhoto(TimestampedModel):
     storage_key = models.CharField(max_length=512)
     thumbnail_key = models.CharField(max_length=512, blank=True, default="")
     confirmed = models.BooleanField(default=False)
+    # Photo moderation (Phase 6): a staff member can reject an off-topic or
+    # low-quality photo. Rejected photos are excluded from consumer surfaces.
+    rejected = models.BooleanField(default=False, db_index=True)
 
     def __str__(self) -> str:
         return self.storage_key
@@ -177,3 +194,29 @@ class Lead(TimestampedModel):
 
     def __str__(self) -> str:
         return f"Lead on {self.building}"
+
+
+class BuildingMergeLog(TimestampedModel):
+    """Audit trail for a duplicate-building merge (Phase 6).
+
+    The source building is deleted after its unit types, snapshots, photos and
+    leads are folded into the surviving target. We keep the source's id/name here
+    so a merge is traceable long after the row is gone.
+    """
+
+    target = models.ForeignKey(
+        Building, on_delete=models.SET_NULL, null=True, related_name="merges_absorbed"
+    )
+    source_id = models.UUIDField(help_text="id of the deleted (absorbed) building")
+    source_name = models.CharField(max_length=200, blank=True, default="")
+    merged_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    # What moved, for a human-readable audit ("3 snapshots, 2 photos, 1 lead").
+    summary = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"merge {self.source_id} → {self.target_id}"

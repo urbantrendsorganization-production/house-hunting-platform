@@ -62,6 +62,29 @@ sitemap present.
 **Remaining (human/measurement gates):** Lighthouse ≥ 90 on real hosting; the
 "5 strangers find a house" usability test; a real Google Maps JS API key for the map.
 
+## ✅ Phase 6 — Back office + data QA — **gate met**
+
+- **Duplicate detection** (`services/duplicates.py`): candidate pairs via spatial
+  proximity (`dwithin`, GiST-indexed) + fuzzy name similarity, de-duplicated and
+  closest-first. Proximity/name thresholds tunable per request.
+- **Merge tool**: folds a source building into a target and deletes the source
+  **without losing a single snapshot, photo, or lead** — same-kind unit types fold
+  (children re-parented before delete), new kinds re-parent wholesale, then freshness
+  is recomputed on the survivor. Every merge writes a read-only `BuildingMergeLog`.
+- **Staleness dashboard** (`services/qa.py`): per-estate health (active / demoted /
+  stale / hidden / never-verified counts + oldest & newest verification), **stalest
+  estate first**; plus a stalest-buildings work queue (never-verified first).
+- **Agent leaderboard**: buildings captured + verifications per agent (agent-payment hook).
+- **Capture review queue** + **photo moderation** (`reviewed_at`/`reviewed_by` on
+  Building, `rejected` on BuildingPhoto). Review is a data-quality trail, never a
+  visibility switch — freshness still owns what consumers see.
+- Staff-only API under `/api/v1/admin/…` (Django staff auth; **never** anonymous-readable).
+  Django admin hardened: append-only snapshots, read-only merge log.
+
+**Verified:** merge preserves snapshots/photos/leads (test-proven, nothing dropped);
+dashboard ranks the stalest estate first and flags hidden listings; leaderboard counts
+captures; back-office endpoints reject anonymous + non-staff callers. Full suite green.
+
 ## ⏳ Remaining phases — need human / device / infra involvement
 
 Scaffolded (directory + README) but not built here — their gates require things
@@ -72,12 +95,9 @@ outside an automated build:
   and field work. The API it targets (`/agent/sync`, presign) is done and live.
 - **Phase 4 — Consumer app (Flutter):** gate needs a mid-range Android device + 5 real
   house-hunter testers. Consumes the finished map API.
-- **Phase 6 — Back office / QA:** Django admin is already hardened (append-only snapshots,
-  read-only vacancy history). Duplicate-merge tooling + dashboards remain.
 - **Phase 7 — Prod hardening:** needs Hetzner/Tailscale access, real domains, backups.
 
 ## Suggested next step
 
-**Phase 6 (back office)** is the next fully code-buildable surface — duplicate-building
-detection (spatial proximity + name similarity), a capture-review queue, and staleness
-dashboards on top of the hardened admin.
+**Phase 7 (prod hardening)** — deploy to Hetzner behind Caddy, backups, monitoring, and
+onboard the first real field agent. Needs infra access, not more application code.

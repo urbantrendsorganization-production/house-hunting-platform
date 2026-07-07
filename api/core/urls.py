@@ -1,6 +1,6 @@
 from django.urls import path
 
-from core import agent_views, consumer_views
+from core import admin_views, agent_views, consumer_views
 from core.views import health
 
 urlpatterns = [
@@ -17,4 +17,25 @@ urlpatterns = [
     # Estate SEO surfaces (Phase 5 backend support)
     path("estates/", consumer_views.estate_list, name="estate-list"),
     path("estates/<slug:slug>/", consumer_views.estate_detail, name="estate-detail"),
+    # Back office / data QA (Phase 6) — staff-only
+    path("admin/duplicates/", admin_views.duplicate_candidates, name="admin-duplicates"),
+    path("admin/buildings/merge/", admin_views.merge_buildings, name="admin-merge"),
+    path("admin/dashboard/staleness/", admin_views.staleness_dashboard, name="admin-staleness"),
+    path(
+        "admin/dashboard/stalest-buildings/",
+        admin_views.stalest_buildings,
+        name="admin-stalest-buildings",
+    ),
+    path("admin/agents/leaderboard/", admin_views.agent_leaderboard, name="admin-leaderboard"),
+    path("admin/review-queue/", admin_views.review_queue, name="admin-review-queue"),
+    path(
+        "admin/buildings/<uuid:building_id>/review/",
+        admin_views.review_building,
+        name="admin-review-building",
+    ),
+    path(
+        "admin/photos/<int:photo_id>/moderate/",
+        admin_views.moderate_photo,
+        name="admin-moderate-photo",
+    ),
 ]
