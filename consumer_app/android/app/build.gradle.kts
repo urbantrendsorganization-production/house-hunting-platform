@@ -16,6 +16,17 @@ val mapsApiKey: String = run {
     props.getProperty("MAPS_API_KEY", "")
 }
 
+// Release signing. Real keystore + passwords live in android/key.properties
+// (git-ignored) — never committed. When it's absent (local dev / CI without
+// secrets) we fall back to the debug key so `flutter build` still works, but a
+// production release MUST be built where key.properties + the keystore exist.
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+val hasReleaseKeystore = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+}
+
 android {
     namespace = "com.urbantrends.consumer_app"
     compileSdk = flutter.compileSdkVersion
@@ -38,11 +49,26 @@ android {
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Sign with the real upload key when it's present; otherwise fall
+            // back to debug so dev/CI builds still succeed (NOT for the store).
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
