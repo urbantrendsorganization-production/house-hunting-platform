@@ -1,14 +1,24 @@
-# Production stack for Keja — Hetzner, behind Caddy (Phase 7).
+# Production stack for Keja — shared UrbanTrends host (Phase 7).
 #
 #   cd ops/compose
 #   cp ../env/prod.env.example .env   # fill in real secrets — never commit .env
-#   docker compose -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.prod.yml up -d --build
 #
-# Differences from the root dev compose:
+# This box already runs a HOST-LEVEL reverse proxy (the one owning :80/:443 for
+# onboardkit / urbantrends / sitechat / rentflow). So keja does NOT bundle its
+# own Caddy — that would fight the host proxy for 80/443. Instead api + web bind
+# to loopback ports and the host proxy fronts them + terminates TLS. See
+# ops/caddy/Caddyfile for the standalone (self-TLS) variant if ever deployed solo.
+#
+# Loopback ports (host-side, 127.0.0.1 only — never 0.0.0.0):
+#   * api -> ${API_HOST_PORT:-8087}   (register api.keja.urbantrends.dev here)
+#   * web -> ${WEB_HOST_PORT:-3002}   (register keja.urbantrends.dev here)
+#   In use on this box already: 3000 3001 5000 8000 8001 8083 8086.
+#
+# Other notes:
 #   * API/worker run the published GHCR image (no local build, no code mount).
 #   * gunicorn (not runserver); a dedicated celery-beat service owns the schedule.
-#   * Caddy terminates TLS and reverse-proxies api + web.
-#   * No host DB/redis ports exposed — only Caddy's 80/443 face the internet.
+#   * db/redis stay internal — no host ports at all.
 #   * restart: unless-stopped everywhere so the box self-heals on reboot.
 name: keja-prod
 
@@ -62,6 +72,9 @@ services:
       gunicorn keja.wsgi:application --bind 0.0.0.0:8000 --workers 3 --access-logfile -
       "
     environment: *api-env
+    # Loopback only — the host reverse proxy fronts this + terminates TLS.
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:-8087}:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -105,26 +118,12 @@ services:
         NEXT_PUBLIC_AGENT_APK_URL: ${NEXT_PUBLIC_AGENT_APK_URL:-}
     environment:
       NODE_ENV: production
-      # Server-side fetches go over the internal network, not back through Caddy.
+      # Server-side fetches go over the internal network, not back out through
+      # the host proxy.
       API_BASE: ${API_BASE:-http://api:8000/api/v1}
-    depends_on:
-      - api
-    restart: unless-stopped
-
-  caddy:
-    image: caddy:2-alpine
+    # Loopback only — the host reverse proxy fronts this + terminates TLS.
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - /srv/keja/caddy/data:/data
-      - /srv/keja/caddy/config:/config
-    environment:
-      API_DOMAIN: ${API_DOMAIN:?set in .env}
-      WEB_DOMAIN: ${WEB_DOMAIN:?set in .env}
-      WEB_UPSTREAM: ${WEB_UPSTREAM:-web:3000}
+      - "127.0.0.1:${WEB_HOST_PORT:-3002}:3000"
     depends_on:
       - api
-      - web
     restart: unless-stopped
