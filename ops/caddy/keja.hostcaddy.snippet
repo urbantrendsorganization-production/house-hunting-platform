@@ -1,0 +1,40 @@
+# Keja vhosts for the SHARED HOST Caddy (not this repo's bundled Caddy).
+#
+# The prod box already runs Caddy on the host owning :80/:443 for the other
+# UrbanTrends stacks. Keja's compose (ops/compose/docker-compose.prod.yml) does
+# NOT run its own Caddy; it publishes api + web on loopback ports and the host
+# Caddy fronts them + terminates TLS.
+#
+# Install:
+#   sudo mkdir -p /var/log/caddy
+#   # append the two blocks below to /etc/caddy/Caddyfile
+#   sudo caddy validate --config /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+#
+# Loopback ports below MUST match API_HOST_PORT / WEB_HOST_PORT in
+# ops/compose/.env (defaults 8087 / 3002). DNS for both names must resolve to
+# this box before reload, or Caddy's TLS cert request fails.
+
+api.keja.urbantrends.dev {
+	encode gzip zstd
+
+	# Cheap liveness probe for uptime monitors — no app round-trip.
+	handle /healthz {
+		respond "ok" 200
+	}
+
+	reverse_proxy 127.0.0.1:8087
+
+	log {
+		output file /var/log/caddy/keja-api.log
+	}
+}
+
+keja.urbantrends.dev {
+	encode gzip zstd
+	reverse_proxy 127.0.0.1:3002
+
+	log {
+		output file /var/log/caddy/keja-web.log
+	}
+}
