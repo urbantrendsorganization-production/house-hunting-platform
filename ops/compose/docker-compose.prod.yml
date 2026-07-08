@@ -162,9 +162,11 @@ services:
         NEXT_PUBLIC_AGENT_APK_URL: ${NEXT_PUBLIC_AGENT_APK_URL:-}
     environment:
       NODE_ENV: production
-      # Server-side fetches go over the internal network, not back out through
-      # the host proxy.
-      API_BASE: ${API_BASE:-http://api:8000/api/v1}
+      # SSR fetches go via the PUBLIC API host (through Caddy), not the internal
+      # http://api:8000. Django's SECURE_SSL_REDIRECT 301-redirects plain-http
+      # internal calls (they carry no X-Forwarded-Proto), which breaks SSR;
+      # routing through Caddy supplies the https proto Django expects.
+      API_BASE: ${API_BASE:-https://${API_DOMAIN}/api/v1}
     # Loopback only — the host reverse proxy fronts this + terminates TLS.
     ports:
       - "127.0.0.1:${WEB_HOST_PORT:-3002}:3000"
