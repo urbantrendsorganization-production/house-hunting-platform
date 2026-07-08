@@ -25,6 +25,13 @@ api.keja.urbantrends.dev {
 	reverse_proxy 127.0.0.1:8087
 }
 
+# Object storage (MinIO S3 API). Fronts presigned photo PUT/GET from the phone
+# + consumer app. Caddy preserves the Host header, which MinIO needs to validate
+# the s3v4 signature. No body-size cap here (photo uploads are a few MB).
+s3.keja.urbantrends.dev {
+	reverse_proxy 127.0.0.1:9100
+}
+
 keja.urbantrends.dev {
 	encode zstd gzip
 
