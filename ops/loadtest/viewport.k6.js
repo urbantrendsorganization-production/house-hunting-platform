@@ -1,6 +1,6 @@
 // Viewport load test for k6 (Phase 7) — the "50x pilot traffic" gate.
 //
-//   k6 run -e BASE_URL=https://api.keja.example ops/loadtest/viewport.k6.js
+//   k6 run -e BASE_URL=https://api.keja.urbantrends.dev ops/loadtest/viewport.k6.js
 //
 // Ramps to 50 virtual users, pans random bounding boxes, and fails the run if
 // p95 latency or the error rate blow past the thresholds.

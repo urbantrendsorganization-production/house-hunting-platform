@@ -13,7 +13,7 @@ Confirm the Django API is deployed (Phase 7 `ops/compose/docker-compose.prod.yml
 + Caddy) and reachable over HTTPS at your real domain, e.g.:
 
 ```bash
-curl -fsS https://api.<your-domain>/api/v1/health/    # must return 200
+curl -fsS https://api.keja.urbantrends.dev/api/v1/health/    # must return 200
 ```
 
 If that fails, the apps have nothing to talk to — stop and finish the deploy.
@@ -47,13 +47,13 @@ The API base URL is a compile-time define. If you forget it, the app defaults to
 # Consumer (Play Store bundle)
 cd consumer_app
 flutter build appbundle --release \
-  --dart-define=API_BASE_URL=https://api.<your-domain> \
+  --dart-define=API_BASE_URL=https://api.keja.urbantrends.dev \
   --dart-define=PLACES_API_KEY=AIza...        # optional, enables search
 
 # Agent (distribute the APK directly to field agents' devices)
 cd ../agent_app
 flutter build apk --release \
-  --dart-define=API_BASE_URL=https://api.<your-domain>
+  --dart-define=API_BASE_URL=https://api.keja.urbantrends.dev
 ```
 The build auto-signs with your keystore because `key.properties` now exists.
 
