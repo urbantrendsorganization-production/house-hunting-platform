@@ -4,7 +4,14 @@ import { fetchEstates } from "@/lib/api";
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const estates = await fetchEstates();
+  // The API isn't reachable during `docker build`; render an empty shell rather
+  // than aborting the build. ISR (revalidate: 60) fills it in once the API is up.
+  let estates: Awaited<ReturnType<typeof fetchEstates>> = [];
+  try {
+    estates = await fetchEstates();
+  } catch {
+    estates = [];
+  }
   const total = estates.reduce((sum, e) => sum + e.active_building_count, 0);
 
   return (
