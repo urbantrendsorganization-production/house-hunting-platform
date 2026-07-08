@@ -90,6 +90,27 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  web:
+    # Website (Next.js). Unlike api/worker/beat, the web image is NOT published
+    # to GHCR by CI, so it's built on the box from ../../web. NEXT_PUBLIC_* are
+    # inlined at build time -> passed as build args; API_BASE is read at runtime.
+    build:
+      context: ../../web
+      args:
+        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-https://${API_DOMAIN}/api/v1}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://${WEB_DOMAIN}}
+        NEXT_PUBLIC_GOOGLE_MAPS_KEY: ${NEXT_PUBLIC_GOOGLE_MAPS_KEY:-}
+        NEXT_PUBLIC_PLAY_STORE_URL: ${NEXT_PUBLIC_PLAY_STORE_URL:-}
+        NEXT_PUBLIC_CONSUMER_APK_URL: ${NEXT_PUBLIC_CONSUMER_APK_URL:-}
+        NEXT_PUBLIC_AGENT_APK_URL: ${NEXT_PUBLIC_AGENT_APK_URL:-}
+    environment:
+      NODE_ENV: production
+      # Server-side fetches go over the internal network, not back through Caddy.
+      API_BASE: ${API_BASE:-http://api:8000/api/v1}
+    depends_on:
+      - api
+    restart: unless-stopped
+
   caddy:
     image: caddy:2-alpine
     ports:
@@ -105,4 +126,5 @@ services:
       WEB_UPSTREAM: ${WEB_UPSTREAM:-web:3000}
     depends_on:
       - api
+      - web
     restart: unless-stopped

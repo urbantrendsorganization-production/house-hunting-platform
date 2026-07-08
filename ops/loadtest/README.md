@@ -18,7 +18,7 @@ anonymous rate limit is doing its job.
 ## k6 (real ramped load)
 
 ```bash
-k6 run -e BASE_URL=https://api.keja.example ops/loadtest/viewport.k6.js
+k6 run -e BASE_URL=https://api.keja.urbantrends.dev ops/loadtest/viewport.k6.js
 ```
 
 Ramps to 50 VUs and fails the run if p95 ≥ 400ms or error rate ≥ 1%.
