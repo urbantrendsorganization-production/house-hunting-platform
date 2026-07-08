@@ -13,6 +13,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DEBUG=(bool, False),
     ALLOWED_HOSTS=(list, ["*"]),
+    # Browser origins allowed to call the API cross-origin (the website + local
+    # dev). The consumer map fetches /map/viewport client-side from keja.* to
+    # api.keja.*, which is cross-origin and needs CORS headers.
+    CORS_ALLOWED_ORIGINS=(list, ["http://localhost:3000"]),
 )
 
 # Load a local .env if present (dev convenience). In containers the env is
@@ -24,6 +28,7 @@ if env_file.exists():
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="dev-insecure-change-me")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -36,11 +41,14 @@ INSTALLED_APPS = [
     "django.contrib.gis",
     # Third-party
     "rest_framework",
+    "corsheaders",
     # Local
     "core",
 ]
 
 MIDDLEWARE = [
+    # Must sit above CommonMiddleware so it can short-circuit CORS preflight.
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
