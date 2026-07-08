@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="108" height="108" viewBox="0 0 108 108">
+  <!-- Adaptive-icon FOREGROUND layer: transparent bg, art within the central
+       72dp safe zone. Background is the ic_launcher_background gradient. -->
+  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"
+        transform="translate(18,18) scale(3)" fill="#FFFFFF"/>
+  <path d="M45 45 L54 36 L63 45 Z" fill="#0B6E4F"/>
+  <path d="M47.5 45 H60.5 V56 H47.5 Z" fill="#0B6E4F"/>
+  <path d="M52 50 H56 V56 H52 Z" fill="#FFFFFF"/>
+</svg>
