@@ -54,6 +54,16 @@ class ApiClient {
     return results.map(SyncResult.fromJson).toList();
   }
 
+  /// GET /estates/ — anonymous-readable. The capture form pins a building to an
+  /// estate *slug that must already exist on the server*; a free-typed slug is
+  /// how "pipeline" got captured and then failed every sync. Fetched when online
+  /// and cached locally so field capture stays offline-first.
+  Future<List<EstateOption>> estates() async {
+    final res = await _dio.get('/estates/');
+    final results = (res.data['results'] as List).cast<Map<String, dynamic>>();
+    return results.map(EstateOption.fromJson).toList();
+  }
+
   /// POST /agent/photos/presign/ — get a presigned PUT URL + storage key.
   Future<PresignedUpload> presignPhoto({
     required String buildingId,
@@ -114,6 +124,19 @@ class SyncResult {
         status: j['status'] as String,
         error: j['error'] as String?,
       );
+}
+
+class EstateOption {
+  EstateOption({required this.slug, required this.name});
+  final String slug;
+  final String name;
+
+  factory EstateOption.fromJson(Map<String, dynamic> j) => EstateOption(
+        slug: j['slug'] as String,
+        name: j['name'] as String,
+      );
+
+  Map<String, dynamic> toJson() => {'slug': slug, 'name': name};
 }
 
 class PresignedUpload {

@@ -15,6 +15,11 @@ class CaptureRepository {
   Stream<List<Building>> watchBuildings() => _db.watchBuildings();
   Stream<int> watchPending() => _db.watchPendingCount();
   Future<List<UnitType>> unitTypesFor(String id) => _db.unitTypesFor(id);
+  Future<Building?> buildingById(String id) => _db.buildingById(id);
+
+  /// Re-point a rejected building at a valid estate and re-queue it for sync.
+  Future<void> retryBuildingWithEstate(String id, String estateSlug) =>
+      _db.retryBuildingWithEstate(id, estateSlug);
 
   /// Persist a captured building. Returns the client_uuid (= its server id).
   Future<String> saveBuilding({

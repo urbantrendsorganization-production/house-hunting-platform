@@ -48,7 +48,17 @@ def normalize_phone(raw: str, default_country: str = KE_COUNTRY_CODE) -> str:
 
 
 def normalize_phone_or_blank(raw: str) -> str:
-    """Lenient variant for optional fields — blank in, blank out."""
-    if not raw:
+    """Lenient variant for optional fields — blank in, blank out.
+
+    A value that carries no subscriber digits is also treated as blank: an
+    untouched capture form leaves the bare ``+254`` country-code prefix behind,
+    and that must not fail an entire building sync over an *optional* field. Only
+    a value with real (but malformed) subscriber digits still raises, so genuine
+    typos surface instead of being silently dropped.
+    """
+    if not raw or not raw.strip():
+        return ""
+    digits = re.sub(r"\D", "", raw)
+    if not digits or digits == KE_COUNTRY_CODE:
         return ""
     return normalize_phone(raw)
