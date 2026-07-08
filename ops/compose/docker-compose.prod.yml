@@ -11,8 +11,10 @@
 # ops/caddy/Caddyfile for the standalone (self-TLS) variant if ever deployed solo.
 #
 # Loopback ports (host-side, 127.0.0.1 only — never 0.0.0.0):
-#   * api -> ${API_HOST_PORT:-8087}   (register api.keja.urbantrends.dev here)
-#   * web -> ${WEB_HOST_PORT:-3002}   (register keja.urbantrends.dev here)
+#   * api        -> ${API_HOST_PORT:-8087}      (api.keja.urbantrends.dev)
+#   * web        -> ${WEB_HOST_PORT:-3002}      (keja.urbantrends.dev)
+#   * minio S3   -> ${MINIO_S3_PORT:-9100}      (s3.keja.urbantrends.dev)
+#   * minio ui   -> ${MINIO_CONSOLE_PORT:-9101} (private — SSH tunnel only)
 #   In use on this box already: 3000 3001 5000 8000 8001 8083 8086.
 #
 # Other notes:
@@ -63,6 +65,47 @@ services:
       timeout: 3s
       retries: 10
     restart: unless-stopped
+
+  minio:
+    # Self-hosted S3-compatible object storage for building/unit photos.
+    # The host Caddy fronts the S3 API publicly at s3.keja.urbantrends.dev so the
+    # presigned PUT/GET URLs the API hands out are reachable from phones/browsers.
+    # Bucket stays PRIVATE — reads go through presigned GET, not public objects.
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set in .env}
+    volumes:
+      - /srv/keja/miniodata:/data
+    # Loopback only. S3 API -> host Caddy (public). Console stays private (SSH tunnel).
+    ports:
+      - "127.0.0.1:${MINIO_S3_PORT:-9100}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9101}:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Creates the media bucket on first boot, then exits (private bucket).
+  minio-setup:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set in .env}
+      BUCKET: ${AWS_STORAGE_BUCKET_NAME:-keja-media}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD} &&
+      mc mb --ignore-existing local/$${BUCKET} &&
+      echo 'bucket ready';
+      "
+    restart: "no"
 
   api:
     image: ${API_IMAGE:-ghcr.io/urbantrendsorganization-production/house-hunting-platform/api:latest}
