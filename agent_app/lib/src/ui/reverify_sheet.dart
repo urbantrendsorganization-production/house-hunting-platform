@@ -16,6 +16,7 @@ class ReverifySheet extends ConsumerStatefulWidget {
 }
 
 class _ReverifySheetState extends ConsumerState<ReverifySheet> {
+  Building? _building;
   List<UnitType>? _units;
   final Map<String, int> _counts = {};
   bool _saving = false;
@@ -27,9 +28,12 @@ class _ReverifySheetState extends ConsumerState<ReverifySheet> {
   }
 
   Future<void> _load() async {
-    final units =
-        await ref.read(captureRepositoryProvider).unitTypesFor(widget.buildingId);
+    final repo = ref.read(captureRepositoryProvider);
+    final building = await repo.buildingById(widget.buildingId);
+    final units = await repo.unitTypesFor(widget.buildingId);
+    if (!mounted) return;
     setState(() {
+      _building = building;
       _units = units;
       for (final u in units) {
         _counts[u.id] = 0;
@@ -51,9 +55,24 @@ class _ReverifySheetState extends ConsumerState<ReverifySheet> {
     }
   }
 
+  /// Re-point a building the server rejected at a valid estate and re-queue it.
+  Future<void> _retryEstate(String slug) async {
+    await ref
+        .read(captureRepositoryProvider)
+        .retryBuildingWithEstate(widget.buildingId, slug);
+    ref.read(syncServiceProvider).drain();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Estate updated — retrying sync.')),
+      );
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final units = _units;
+    final building = _building;
     return Padding(
       padding: EdgeInsets.only(
         left: 16,
@@ -65,6 +84,11 @@ class _ReverifySheetState extends ConsumerState<ReverifySheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (building != null && building.syncStatus == SyncStatus.failed)
+            _SyncErrorBanner(
+              error: building.syncError,
+              onFixEstate: _retryEstate,
+            ),
           Text('Re-verify vacancy',
               style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 4),
@@ -99,6 +123,99 @@ class _ReverifySheetState extends ConsumerState<ReverifySheet> {
             onPressed: (units == null || units.isEmpty || _saving) ? null : _save,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Shown when a building failed to sync. Surfaces the server's error (so the
+/// agent isn't staring at a bare red icon) and, since the most common cause is
+/// an estate that doesn't exist on the server, offers a one-tap re-point to a
+/// known-good estate.
+class _SyncErrorBanner extends ConsumerStatefulWidget {
+  const _SyncErrorBanner({required this.error, required this.onFixEstate});
+  final String? error;
+  final Future<void> Function(String slug) onFixEstate;
+
+  @override
+  ConsumerState<_SyncErrorBanner> createState() => _SyncErrorBannerState();
+}
+
+class _SyncErrorBannerState extends ConsumerState<_SyncErrorBanner> {
+  String? _slug;
+
+  @override
+  Widget build(BuildContext context) {
+    final options = ref.watch(estateOptionsProvider);
+    final scheme = Theme.of(context).colorScheme;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      color: scheme.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.error_outline, color: scheme.onErrorContainer),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Sync failed',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: scheme.onErrorContainer),
+                  ),
+                ),
+              ],
+            ),
+            if (widget.error != null && widget.error!.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(widget.error!,
+                  style: TextStyle(color: scheme.onErrorContainer)),
+            ],
+            // Estate correction — only useful when we have the estate list.
+            options.maybeWhen(
+              data: (estates) => estates.isEmpty
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              initialValue: _slug,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Move to estate',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                              items: [
+                                for (final e in estates)
+                                  DropdownMenuItem(
+                                      value: e.slug,
+                                      child: Text('${e.name} · ${e.slug}')),
+                              ],
+                              onChanged: (v) => setState(() => _slug = v),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton(
+                            onPressed: _slug == null
+                                ? null
+                                : () => widget.onFixEstate(_slug!),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+              orElse: () => const SizedBox.shrink(),
+            ),
+          ],
+        ),
       ),
     );
   }

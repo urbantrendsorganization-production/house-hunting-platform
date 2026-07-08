@@ -95,6 +95,9 @@ class AppDatabase extends _$AppDatabase {
   Future<List<UnitType>> unitTypesFor(String buildingId) =>
       (select(unitTypes)..where((u) => u.buildingId.equals(buildingId))).get();
 
+  Future<Building?> buildingById(String id) =>
+      (select(buildings)..where((b) => b.id.equals(id))).getSingleOrNull();
+
   /// Count of buildings still needing a sync — drives the status badge. A
   /// building-level signal is enough for the headline; children ride with them.
   Stream<int> watchPendingCount() {
@@ -140,6 +143,17 @@ class AppDatabase extends _$AppDatabase {
   Future<void> markPhotoSynced(String id, SyncStatus status, {String? error}) =>
       (update(photos)..where((ph) => ph.id.equals(id))).write(
         PhotosCompanion(syncStatus: Value(status), syncError: Value(error)),
+      );
+
+  /// Correct a failed building's estate and re-queue it for sync. Used when the
+  /// server rejected the original estate slug (it didn't exist there).
+  Future<void> retryBuildingWithEstate(String id, String estateSlug) =>
+      (update(buildings)..where((b) => b.id.equals(id))).write(
+        BuildingsCompanion(
+          estateSlug: Value(estateSlug),
+          syncStatus: const Value(SyncStatus.pending),
+          syncError: const Value(null),
+        ),
       );
 
   Future<void> setPhotoUploaded(String id, String storageKey) =>

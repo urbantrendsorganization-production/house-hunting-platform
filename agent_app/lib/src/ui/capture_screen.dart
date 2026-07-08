@@ -90,7 +90,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
         floors: int.tryParse(_floors.text.trim()),
         parking: _parking,
         caretakerName: _caretakerName.text.trim(),
-        caretakerPhone: _caretakerPhone.text.trim(),
+        caretakerPhone: _cleanPhone(_caretakerPhone.text),
       );
 
       for (final u in _units) {
@@ -126,6 +126,16 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
   void _toast(String msg) => ScaffoldMessenger.of(context)
       .showSnackBar(SnackBar(content: Text(msg)));
 
+  /// The phone field is pre-filled with the bare "+254" prefix for convenience.
+  /// If the agent never types a number, don't send the prefix — the server
+  /// rejects it as an invalid KE number and fails the whole building sync.
+  String _cleanPhone(String raw) {
+    final trimmed = raw.trim();
+    final digits = trimmed.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty || digits == '254') return '';
+    return trimmed;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -145,16 +155,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
               onRepin: () => setState(() => _pinned = null),
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _estate,
-              decoration: const InputDecoration(
-                labelText: 'Estate slug',
-                helperText: 'e.g. roysambu — must exist on the server',
-                border: OutlineInputBorder(),
-              ),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Required' : null,
-            ),
+            _EstateField(controller: _estate),
             const SizedBox(height: 12),
             TextFormField(
               controller: _name,
@@ -402,6 +403,59 @@ class _UnitRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Estate picker. A building must pin to an estate slug that already exists on
+/// the server — a free-typed slug (e.g. "pipeline") fails every sync silently.
+/// So when we have the estate list (cached offline-first), this is a dropdown of
+/// known-good slugs. It falls back to free text only if we've never been online
+/// and have nothing cached, so field capture is never blocked.
+class _EstateField extends ConsumerWidget {
+  const _EstateField({required this.controller});
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final options = ref.watch(estateOptionsProvider);
+
+    return options.when(
+      loading: () => _fallbackTextField(enabled: true),
+      error: (_, _) => _fallbackTextField(enabled: true),
+      data: (estates) {
+        if (estates.isEmpty) return _fallbackTextField(enabled: true);
+        final slugs = estates.map((e) => e.slug).toSet();
+        final current = slugs.contains(controller.text) ? controller.text : null;
+        return DropdownButtonFormField<String>(
+          initialValue: current,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Estate',
+            helperText: 'Pick the estate this building is in',
+            border: OutlineInputBorder(),
+          ),
+          items: [
+            for (final e in estates)
+              DropdownMenuItem(value: e.slug, child: Text('${e.name} · ${e.slug}')),
+          ],
+          onChanged: (v) => controller.text = v ?? '',
+          validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+        );
+      },
+    );
+  }
+
+  Widget _fallbackTextField({required bool enabled}) {
+    return TextFormField(
+      controller: controller,
+      enabled: enabled,
+      decoration: const InputDecoration(
+        labelText: 'Estate slug',
+        helperText: 'e.g. roysambu — must exist on the server',
+        border: OutlineInputBorder(),
+      ),
+      validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
     );
   }
 }
