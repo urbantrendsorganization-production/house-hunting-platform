@@ -6,9 +6,17 @@ import { BuildingCard } from "@/components/BuildingCard";
 export const revalidate = 60;
 
 // Pre-render an SSG page per estate; ISR keeps them fresh (60s) afterwards.
+// The API is NOT reachable during `docker build`, so a failed fetch must not
+// abort the build — fall back to zero prerendered params. dynamicParams
+// (default true) + revalidate then render each estate on-demand once the API
+// is live, so nothing is lost, just deferred to first request.
 export async function generateStaticParams() {
-  const estates = await fetchEstates();
-  return estates.map((e) => ({ estate: e.slug }));
+  try {
+    const estates = await fetchEstates();
+    return estates.map((e) => ({ estate: e.slug }));
+  } catch {
+    return [];
+  }
 }
 
 type Params = { params: Promise<{ estate: string }> };
