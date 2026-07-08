@@ -27,5 +27,14 @@ api.keja.urbantrends.dev {
 
 keja.urbantrends.dev {
 	encode zstd gzip
+
+	# Direct APK distribution for field agents (internal tool, not Play Store).
+	# Drop signed APKs in /srv/keja/downloads/ and point NEXT_PUBLIC_AGENT_APK_URL
+	# at https://keja.urbantrends.dev/downloads/<file>.apk (rebuild web after).
+	handle /downloads/* {
+		root * /srv/keja
+		file_server
+	}
+
 	reverse_proxy 127.0.0.1:3002
 }
