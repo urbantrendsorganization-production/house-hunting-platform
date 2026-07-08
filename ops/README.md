@@ -1,12 +1,13 @@
 # ops — Deploy & infrastructure (Phase 7)
 
-Production deploy, backups, monitoring, and load testing for Keja on Hetzner
-behind Caddy. Local dev still uses the root `docker-compose.yml`, not this dir.
+Production deploy, backups, monitoring, and load testing for Keja on the shared
+UrbanTrends host. Local dev still uses the root `docker-compose.yml`, not this dir.
 
 ```
 ops/
-├── compose/docker-compose.prod.yml   # prod stack (GHCR image, gunicorn, beat, Caddy)
-├── caddy/Caddyfile                   # reverse proxy + automatic TLS
+├── compose/docker-compose.prod.yml   # prod stack (GHCR api image, gunicorn, beat, web)
+├── caddy/keja.hostcaddy.snippet      # vhosts to add to the shared HOST Caddy
+├── caddy/Caddyfile                   # standalone self-TLS variant (solo deploy only)
 ├── env/prod.env.example              # prod env shape (placeholders only)
 ├── backup/                           # pg_dump backup + restore scripts (+ rehearsal)
 └── loadtest/                         # viewport load test (stdlib harness + k6)
@@ -14,15 +15,33 @@ ops/
 
 ## Deploy
 
+The prod box already runs a **host-level Caddy** owning `:80/:443` for the other
+UrbanTrends stacks, so keja does **not** run its own Caddy. The stack publishes
+`api` and `web` on loopback ports and the host Caddy fronts them + does TLS.
+
 ```bash
 cd ops/compose
 cp ../env/prod.env.example .env      # fill with REAL secrets — never commit .env
-docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d --build
+
+# verify on loopback BEFORE touching the proxy
+curl -fsS http://127.0.0.1:8087/api/v1/health/   # API (API_HOST_PORT)
+curl -fsS -I http://127.0.0.1:3002/              # web (WEB_HOST_PORT)
 ```
 
-Caddy fetches TLS certs for `$API_DOMAIN` / `$WEB_DOMAIN` automatically. Only
-80/443 face the internet; Postgres and Redis stay on the internal network.
-Persistent state lives under `/srv/keja` (pgdata, redisdata, caddy, backups).
+Then register the vhosts with the host Caddy (DNS must resolve to the box first):
+
+```bash
+sudo mkdir -p /var/log/caddy
+# append ops/caddy/keja.hostcaddy.snippet to /etc/caddy/Caddyfile
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+```
+
+Postgres and Redis stay internal (no host ports). Persistent state lives under
+`/srv/keja` (pgdata, redisdata, backups). The `web` image is built on the box;
+`api`/`worker`/`beat` pull the published GHCR image (`docker login ghcr.io` first
+if the package is private).
 
 ## Backups
 
