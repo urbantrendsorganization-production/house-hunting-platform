@@ -76,6 +76,26 @@ h1 {
   gap: 14px;
 }
 
+.photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.photos img {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+.card .photos img {
+  height: 110px;
+}
+
 .card {
   background: var(--panel);
   border: 1px solid var(--border);

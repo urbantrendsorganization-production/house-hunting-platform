@@ -1,5 +1,6 @@
 import type {
   BuildingDetail,
+  ContactReveal,
   EstateDetail,
   EstateSummary,
   ViewportResponse,
@@ -43,6 +44,21 @@ export async function fetchBuilding(id: string): Promise<BuildingDetail | null> 
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`API ${res.status} for building ${id}`);
   return (await res.json()) as BuildingDetail;
+}
+
+// Reveal the caretaker contact — records a Lead server-side. Called from the
+// browser on user action, so it hits the public base (no SSR caching).
+export async function revealContact(
+  id: string,
+  unitTypeId?: number,
+): Promise<ContactReveal> {
+  const res = await fetch(`${PUBLIC_BASE}/buildings/${id}/contact/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(unitTypeId ? { unit_type: unitTypeId } : {}),
+  });
+  if (!res.ok) throw new Error(`contact ${res.status}`);
+  return (await res.json()) as ContactReveal;
 }
 
 export async function fetchViewport(

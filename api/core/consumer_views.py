@@ -22,9 +22,10 @@ from core.consumer_serializers import (
     BuildingMarkerSerializer,
     EstateSerializer,
 )
-from core.models import Building, Estate
+from core.models import Building, Estate, Lead, UnitType
 from core.services import map_queries
 from core.services.map_queries import BboxTooLarge
+from core.services.phone import normalize_phone_or_blank
 
 
 class ViewportThrottle(AnonRateThrottle):
@@ -142,3 +143,33 @@ def building_detail(request, building_id):
         has_active_vacancy=True,
     )
     return Response(BuildingDetailSerializer(building).data)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def building_contact(request, building_id):
+    """Reveal the caretaker's contact — the Lead-gated business hook.
+
+    Requesting contact records a Lead (who wanted which building/unit), then
+    returns the caretaker's name + phone. Anonymous for now; the auth requirement
+    is a later business-model switch, so we already capture the lead trail.
+    """
+    building = get_object_or_404(Building, id=building_id, has_active_vacancy=True)
+
+    unit_type = None
+    unit_type_id = request.data.get("unit_type")
+    if unit_type_id:
+        unit_type = UnitType.objects.filter(id=unit_type_id, building=building).first()
+
+    Lead.objects.create(
+        building=building,
+        unit_type=unit_type,
+        contact_phone=normalize_phone_or_blank(request.data.get("contact_phone", "")),
+        note=request.data.get("note", ""),
+    )
+    return Response(
+        {
+            "caretaker_name": building.caretaker_name,
+            "caretaker_phone": building.caretaker_phone,
+        }
+    )
