@@ -41,9 +41,9 @@ export default async function BuildingPage({ params }: Params) {
         <VerifiedBadge days={b.verified_days_ago} />
       </div>
 
-      {b.photos.length > 0 && (
+      {(b.photos ?? []).length > 0 && (
         <div className="photos">
-          {b.photos.map((src) => (
+          {(b.photos ?? []).map((src) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img key={src} src={src} alt={`${b.name || "Building"} in ${b.estate}`} />
           ))}
@@ -64,9 +64,9 @@ export default async function BuildingPage({ params }: Params) {
                 ? `${u.vacant_count} vacant`
                 : "Vacancy unconfirmed"}
             </div>
-            {u.photos.length > 0 && (
+            {(u.photos ?? []).length > 0 && (
               <div className="photos">
-                {u.photos.map((src) => (
+                {(u.photos ?? []).map((src) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img key={src} src={src} alt={u.kind_display} />
                 ))}
