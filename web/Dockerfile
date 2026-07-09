@@ -49,8 +49,11 @@ ENV NODE_ENV=production \
 RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
 
 # Standalone output bundles a minimal server.js + only the deps it traced.
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+# Own the tree as `nextjs`, and pre-create `.next/cache` — ISR/prerender
+# revalidation writes there at runtime, and a root-owned .next would EACCES.
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+RUN mkdir -p .next/cache && chown -R nextjs:nodejs .next
 
 USER nextjs
 EXPOSE 3000
