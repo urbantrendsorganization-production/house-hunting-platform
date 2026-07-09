@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { fetchBuilding } from "@/lib/api";
 import { formatKes, verifiedLabel } from "@/lib/format";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { ContactReveal } from "@/components/ContactReveal";
 
 export const revalidate = 60;
 
@@ -40,6 +41,15 @@ export default async function BuildingPage({ params }: Params) {
         <VerifiedBadge days={b.verified_days_ago} />
       </div>
 
+      {b.photos.length > 0 && (
+        <div className="photos">
+          {b.photos.map((src) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={src} src={src} alt={`${b.name || "Building"} in ${b.estate}`} />
+          ))}
+        </div>
+      )}
+
       <h2>Available units</h2>
       <div className="grid">
         {b.unit_types.map((u) => (
@@ -48,6 +58,19 @@ export default async function BuildingPage({ params }: Params) {
             <div className="price">{formatKes(u.rent_kes)}/mo</div>
             {u.deposit_kes != null && (
               <div className="meta">Deposit {formatKes(u.deposit_kes)}</div>
+            )}
+            <div className="meta">
+              {u.vacant_count != null
+                ? `${u.vacant_count} vacant`
+                : "Vacancy unconfirmed"}
+            </div>
+            {u.photos.length > 0 && (
+              <div className="photos">
+                {u.photos.map((src) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={src} src={src} alt={u.kind_display} />
+                ))}
+              </div>
             )}
           </div>
         ))}
@@ -61,6 +84,9 @@ export default async function BuildingPage({ params }: Params) {
         {b.power_notes && <div>Power: {b.power_notes}</div>}
         {b.security_notes && <div>Security: {b.security_notes}</div>}
       </div>
+
+      <h2 style={{ marginTop: 24 }}>Contact</h2>
+      <ContactReveal buildingId={b.id} caretakerName={b.caretaker_name} />
 
       <a className="btn" href={mapsHref} target="_blank" rel="noopener noreferrer">
         Directions on Google Maps →

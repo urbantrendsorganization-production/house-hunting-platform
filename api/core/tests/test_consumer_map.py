@@ -9,7 +9,7 @@ from django.contrib.gis.geos import Point
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from core.models import Building
+from core.models import Building, BuildingPhoto, Lead, UnitType, VacancySnapshot
 
 pytestmark = pytest.mark.django_db
 
@@ -87,3 +87,59 @@ def test_building_detail_404_when_hidden(estate):
     client = APIClient()
     assert client.get(f"/api/v1/buildings/{hidden.id}/").status_code == 404
     assert client.get(f"/api/v1/buildings/{active.id}/").status_code == 200
+
+
+def _stock_building(estate):
+    """An active building with a unit, a current vacancy, and photos."""
+    b = _building(estate, lng=36.896, lat=-1.219, active=True)
+    b.caretaker_name = "Jane Caretaker"
+    b.caretaker_phone = "+254712000111"
+    b.save()
+    ut = UnitType.objects.create(building=b, kind=UnitType.Kind.BEDSITTER, rent_kes=8000)
+    VacancySnapshot.objects.create(unit_type=ut, vacant_count=3, verified_at=timezone.now())
+    # A confirmed building photo, a confirmed unit photo, and a rejected one.
+    BuildingPhoto.objects.create(building=b, storage_key="buildings/x/a.jpg", confirmed=True)
+    BuildingPhoto.objects.create(
+        building=b, unit_type=ut, storage_key="buildings/x/b.jpg", confirmed=True
+    )
+    BuildingPhoto.objects.create(
+        building=b, storage_key="buildings/x/bad.jpg", confirmed=True, rejected=True
+    )
+    return b, ut
+
+
+def test_detail_surfaces_photos_and_vacancy_but_hides_phone(estate):
+    b, _ut = _stock_building(estate)
+    body = APIClient().get(f"/api/v1/buildings/{b.id}/").json()
+
+    # Building-level photo present; rejected + unit-level ones excluded here.
+    assert len(body["photos"]) == 1
+    assert body["photos"][0].startswith("http")
+
+    unit = body["unit_types"][0]
+    assert unit["vacant_count"] == 3
+    assert len(unit["photos"]) == 1  # the unit's own photo
+
+    # Caretaker name is public; the phone is the Lead-gated business hook.
+    assert body["caretaker_name"] == "Jane Caretaker"
+    assert "caretaker_phone" not in body
+
+
+def test_contact_reveal_returns_phone_and_records_lead(estate):
+    b, ut = _stock_building(estate)
+    resp = APIClient().post(
+        f"/api/v1/buildings/{b.id}/contact/",
+        {"unit_type": ut.id, "note": "interested"},
+        format="json",
+    )
+    assert resp.status_code == 200
+    assert resp.json()["caretaker_phone"] == "+254712000111"
+    lead = Lead.objects.get(building=b)
+    assert lead.unit_type_id == ut.id
+
+
+def test_contact_reveal_404_when_hidden(estate):
+    hidden = _building(estate, lng=36.895, lat=-1.218, active=False)
+    resp = APIClient().post(f"/api/v1/buildings/{hidden.id}/contact/", {}, format="json")
+    assert resp.status_code == 404
+    assert not Lead.objects.exists()

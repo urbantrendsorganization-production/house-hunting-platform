@@ -14,6 +14,11 @@ urlpatterns = [
     path("map/viewport/", consumer_views.viewport, name="map-viewport"),
     path("map/near-me/", consumer_views.near_me, name="map-near-me"),
     path("buildings/<uuid:building_id>/", consumer_views.building_detail, name="building-detail"),
+    path(
+        "buildings/<uuid:building_id>/contact/",
+        consumer_views.building_contact,
+        name="building-contact",
+    ),
     # Estate SEO surfaces (Phase 5 backend support)
     path("estates/", consumer_views.estate_list, name="estate-list"),
     path("estates/<slug:slug>/", consumer_views.estate_detail, name="estate-detail"),

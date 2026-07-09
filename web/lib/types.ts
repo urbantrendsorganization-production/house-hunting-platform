@@ -13,6 +13,8 @@ export interface UnitType {
   rent_kes: number;
   deposit_kes: number | null;
   amenities: Record<string, unknown>;
+  vacant_count: number | null;
+  photos: string[];
 }
 
 export interface BuildingMarker {
@@ -37,7 +39,13 @@ export interface BuildingDetail extends BuildingMarker {
   power_notes: string;
   security_notes: string;
   caretaker_name: string;
+  photos: string[];
   unit_types: UnitType[];
+}
+
+export interface ContactReveal {
+  caretaker_name: string;
+  caretaker_phone: string;
 }
 
 export interface EstateDetail {
