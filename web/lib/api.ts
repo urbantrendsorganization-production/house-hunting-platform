@@ -7,7 +7,7 @@ import type {
 } from "./types";
 
 // Server-side calls reach Django directly; the browser uses the public base.
-const SERVER_BASE = process.env.API_BASE ?? "http://localhost:8000/api/v1";
+export const SERVER_BASE = process.env.API_BASE ?? "http://localhost:8000/api/v1";
 export const PUBLIC_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000/api/v1";
 
@@ -46,13 +46,15 @@ export async function fetchBuilding(id: string): Promise<BuildingDetail | null> 
   return (await res.json()) as BuildingDetail;
 }
 
-// Reveal the caretaker contact — records a Lead server-side. Called from the
-// browser on user action, so it hits the public base (no SSR caching).
+// Reveal the caretaker contact — records a Lead. Routed through our own
+// same-origin route handler (app/api/buildings/[id]/contact) which forwards to
+// Django server-side, so the browser never makes a cross-origin write (no CORS
+// preflight) and the Lead-writing call stays server-side for the future auth gate.
 export async function revealContact(
   id: string,
   unitTypeId?: number,
 ): Promise<ContactReveal> {
-  const res = await fetch(`${PUBLIC_BASE}/buildings/${id}/contact/`, {
+  const res = await fetch(`/api/buildings/${id}/contact/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(unitTypeId ? { unit_type: unitTypeId } : {}),
