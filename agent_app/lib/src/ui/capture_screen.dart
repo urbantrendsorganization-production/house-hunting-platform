@@ -71,6 +71,11 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     if (path != null) setState(() => _photoPaths.add(path));
   }
 
+  Future<void> _addUnitPhoto(_UnitDraft draft) async {
+    final path = await ref.read(photoServiceProvider).captureCompressed();
+    if (path != null) setState(() => draft.photoPaths.add(path));
+  }
+
   Future<void> _save() async {
     if (_pinned == null) {
       _toast('Pin the building at the gate first.');
@@ -101,11 +106,21 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
           kind: u.kind,
           rentKes: rent,
           depositKes: int.tryParse(u.deposit.text.trim()),
+          amenities: u.amenities,
         );
         await repo.addVacancy(
           unitTypeId: unitId,
           vacantCount: int.tryParse(u.vacant.text.trim()) ?? 0,
         );
+        // Photos taken against this unit ride on its unit_type, so consumer
+        // surfaces can show them per unit rather than only building-wide.
+        for (final path in u.photoPaths) {
+          await repo.addPhoto(
+            buildingId: buildingId,
+            unitTypeId: unitId,
+            localPath: path,
+          );
+        }
       }
 
       for (final path in _photoPaths) {
@@ -224,13 +239,14 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                       ? () => setState(() => _units.removeAt(e.key))
                       : null,
                   onChanged: () => setState(() {}),
+                  onAddPhoto: () => _addUnitPhoto(e.value),
                 )),
             const SizedBox(height: 16),
             OutlinedButton.icon(
               icon: const Icon(Icons.camera_alt),
               label: Text(_photoPaths.isEmpty
-                  ? 'Add photo'
-                  : '${_photoPaths.length} photo(s) — add more'),
+                  ? 'Add building photo'
+                  : '${_photoPaths.length} building photo(s) — add more'),
               onPressed: _addPhoto,
             ),
             const SizedBox(height: 24),
@@ -328,13 +344,26 @@ class _UnitRow extends StatelessWidget {
     required this.draft,
     required this.onRemove,
     required this.onChanged,
+    required this.onAddPhoto,
   });
 
   final _UnitDraft draft;
   final VoidCallback? onRemove;
   final VoidCallback onChanged;
+  final VoidCallback onAddPhoto;
 
   static const _kinds = ['BEDSITTER', '1BR', '2BR', '3BR', 'SINGLE'];
+
+  // Unit-level amenities: slug (sent to the API as a flag map) → display label.
+  static const _amenities = <String, String>{
+    'wifi': 'WiFi',
+    'water_included': 'Water incl.',
+    'hot_shower': 'Hot shower',
+    'tiled': 'Tiled',
+    'balcony': 'Balcony',
+    'master_ensuite': 'Master ensuite',
+    'furnished': 'Furnished',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -399,6 +428,37 @@ class _UnitRow extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                for (final entry in _amenities.entries)
+                  FilterChip(
+                    label: Text(entry.value),
+                    selected: draft.amenities.contains(entry.key),
+                    onSelected: (on) {
+                      if (on) {
+                        draft.amenities.add(entry.key);
+                      } else {
+                        draft.amenities.remove(entry.key);
+                      }
+                      onChanged();
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.camera_alt, size: 18),
+                label: Text(draft.photoPaths.isEmpty
+                    ? 'Add unit photo'
+                    : '${draft.photoPaths.length} unit photo(s) — add more'),
+                onPressed: onAddPhoto,
+              ),
             ),
           ],
         ),
@@ -465,6 +525,8 @@ class _UnitDraft {
   final rent = TextEditingController();
   final deposit = TextEditingController();
   final vacant = TextEditingController(text: '1');
+  final Set<String> amenities = {};
+  final List<String> photoPaths = [];
 
   void dispose() {
     rent.dispose();

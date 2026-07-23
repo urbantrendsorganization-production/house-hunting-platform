@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:agent_app/src/data/capture_repository.dart';
 import 'package:agent_app/src/data/local/database.dart';
 import 'package:drift/native.dart';
@@ -38,6 +40,49 @@ void main() {
     expect((await db.pendingUnitTypes()).single.buildingId, buildingId);
     expect((await db.pendingSnapshots()).single.unitTypeId, unitId);
     expect((await db.pendingPhotos()).single.buildingId, buildingId);
+  });
+
+  test('unit amenities persist as the flag map the API expects', () async {
+    final b = await repo.saveBuilding(
+        estateSlug: 'roysambu', name: '', lat: -1.2, lng: 36.9, gpsAccuracy: 5);
+    await repo.saveUnitType(
+      buildingId: b,
+      kind: '1BR',
+      rentKes: 15000,
+      amenities: {'wifi', 'hot_shower'},
+    );
+
+    final unit = (await db.pendingUnitTypes()).single;
+    // Stored shape must be a JSON dict of selected flags → true (JSONB on the
+    // server, Record<string, unknown> on the consumer surfaces).
+    expect(jsonDecode(unit.amenities), {'wifi': true, 'hot_shower': true});
+
+    // A unit with no amenities selected stays an empty dict, never null.
+    final u2 =
+        await repo.saveUnitType(buildingId: b, kind: 'BEDSITTER', rentKes: 8000);
+    final bare =
+        (await db.pendingUnitTypes()).firstWhere((u) => u.id == u2);
+    expect(jsonDecode(bare.amenities), isEmpty);
+  });
+
+  test('photos scope to a unit or to the building', () async {
+    final b = await repo.saveBuilding(
+        estateSlug: 'roysambu', name: '', lat: -1.2, lng: 36.9, gpsAccuracy: 5);
+    final u =
+        await repo.saveUnitType(buildingId: b, kind: '1BR', rentKes: 15000);
+
+    await repo.addPhoto(
+        buildingId: b, unitTypeId: u, localPath: '/tmp/unit.jpg');
+    await repo.addPhoto(buildingId: b, localPath: '/tmp/building.jpg');
+
+    final photos = await db.pendingPhotos();
+    final unitPhoto = photos.firstWhere((p) => p.localPath == '/tmp/unit.jpg');
+    final buildingPhoto =
+        photos.firstWhere((p) => p.localPath == '/tmp/building.jpg');
+    // A unit photo carries its unit_type so it lands on that unit downstream;
+    // a building photo leaves it null (server filters building shots on null).
+    expect(unitPhoto.unitTypeId, u);
+    expect(buildingPhoto.unitTypeId, isNull);
   });
 
   test('re-verify appends a NEW snapshot without touching the old one',

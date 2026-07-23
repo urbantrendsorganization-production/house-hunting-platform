@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -116,6 +117,7 @@ class SyncService {
           'kind': u.kind,
           'rent_kes': u.rentKes,
           'deposit_kes': u.depositKes,
+          'amenities': _decodeAmenities(u.amenities),
         },
       });
     }
@@ -149,6 +151,17 @@ class SyncService {
     }
 
     return records;
+  }
+
+  /// Locally-stored amenities are a JSON flag map; the API expects the dict
+  /// verbatim. A corrupt/empty value degrades to {} rather than failing sync.
+  Map<String, dynamic> _decodeAmenities(String raw) {
+    if (raw.isEmpty) return const {};
+    try {
+      return (jsonDecode(raw) as Map).cast<String, dynamic>();
+    } catch (_) {
+      return const {};
+    }
   }
 
   Future<void> _applyResults(List<SyncResult> results) async {

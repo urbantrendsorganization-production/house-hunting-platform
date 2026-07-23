@@ -1004,6 +1004,18 @@ class $UnitTypesTable extends UnitTypes
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _amenitiesMeta = const VerificationMeta(
+    'amenities',
+  );
+  @override
+  late final GeneratedColumn<String> amenities = GeneratedColumn<String>(
+    'amenities',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1014,6 +1026,7 @@ class $UnitTypesTable extends UnitTypes
     kind,
     rentKes,
     depositKes,
+    amenities,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1074,6 +1087,12 @@ class $UnitTypesTable extends UnitTypes
         depositKes.isAcceptableOrUnknown(data['deposit_kes']!, _depositKesMeta),
       );
     }
+    if (data.containsKey('amenities')) {
+      context.handle(
+        _amenitiesMeta,
+        amenities.isAcceptableOrUnknown(data['amenities']!, _amenitiesMeta),
+      );
+    }
     return context;
   }
 
@@ -1117,6 +1136,10 @@ class $UnitTypesTable extends UnitTypes
         DriftSqlType.int,
         data['${effectivePrefix}deposit_kes'],
       ),
+      amenities: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}amenities'],
+      )!,
     );
   }
 
@@ -1138,6 +1161,7 @@ class UnitType extends DataClass implements Insertable<UnitType> {
   final String kind;
   final int rentKes;
   final int? depositKes;
+  final String amenities;
   const UnitType({
     required this.id,
     required this.syncStatus,
@@ -1147,6 +1171,7 @@ class UnitType extends DataClass implements Insertable<UnitType> {
     required this.kind,
     required this.rentKes,
     this.depositKes,
+    required this.amenities,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1167,6 +1192,7 @@ class UnitType extends DataClass implements Insertable<UnitType> {
     if (!nullToAbsent || depositKes != null) {
       map['deposit_kes'] = Variable<int>(depositKes);
     }
+    map['amenities'] = Variable<String>(amenities);
     return map;
   }
 
@@ -1184,6 +1210,7 @@ class UnitType extends DataClass implements Insertable<UnitType> {
       depositKes: depositKes == null && nullToAbsent
           ? const Value.absent()
           : Value(depositKes),
+      amenities: Value(amenities),
     );
   }
 
@@ -1203,6 +1230,7 @@ class UnitType extends DataClass implements Insertable<UnitType> {
       kind: serializer.fromJson<String>(json['kind']),
       rentKes: serializer.fromJson<int>(json['rentKes']),
       depositKes: serializer.fromJson<int?>(json['depositKes']),
+      amenities: serializer.fromJson<String>(json['amenities']),
     );
   }
   @override
@@ -1219,6 +1247,7 @@ class UnitType extends DataClass implements Insertable<UnitType> {
       'kind': serializer.toJson<String>(kind),
       'rentKes': serializer.toJson<int>(rentKes),
       'depositKes': serializer.toJson<int?>(depositKes),
+      'amenities': serializer.toJson<String>(amenities),
     };
   }
 
@@ -1231,6 +1260,7 @@ class UnitType extends DataClass implements Insertable<UnitType> {
     String? kind,
     int? rentKes,
     Value<int?> depositKes = const Value.absent(),
+    String? amenities,
   }) => UnitType(
     id: id ?? this.id,
     syncStatus: syncStatus ?? this.syncStatus,
@@ -1240,6 +1270,7 @@ class UnitType extends DataClass implements Insertable<UnitType> {
     kind: kind ?? this.kind,
     rentKes: rentKes ?? this.rentKes,
     depositKes: depositKes.present ? depositKes.value : this.depositKes,
+    amenities: amenities ?? this.amenities,
   );
   UnitType copyWithCompanion(UnitTypesCompanion data) {
     return UnitType(
@@ -1257,6 +1288,7 @@ class UnitType extends DataClass implements Insertable<UnitType> {
       depositKes: data.depositKes.present
           ? data.depositKes.value
           : this.depositKes,
+      amenities: data.amenities.present ? data.amenities.value : this.amenities,
     );
   }
 
@@ -1270,7 +1302,8 @@ class UnitType extends DataClass implements Insertable<UnitType> {
           ..write('buildingId: $buildingId, ')
           ..write('kind: $kind, ')
           ..write('rentKes: $rentKes, ')
-          ..write('depositKes: $depositKes')
+          ..write('depositKes: $depositKes, ')
+          ..write('amenities: $amenities')
           ..write(')'))
         .toString();
   }
@@ -1285,6 +1318,7 @@ class UnitType extends DataClass implements Insertable<UnitType> {
     kind,
     rentKes,
     depositKes,
+    amenities,
   );
   @override
   bool operator ==(Object other) =>
@@ -1297,7 +1331,8 @@ class UnitType extends DataClass implements Insertable<UnitType> {
           other.buildingId == this.buildingId &&
           other.kind == this.kind &&
           other.rentKes == this.rentKes &&
-          other.depositKes == this.depositKes);
+          other.depositKes == this.depositKes &&
+          other.amenities == this.amenities);
 }
 
 class UnitTypesCompanion extends UpdateCompanion<UnitType> {
@@ -1309,6 +1344,7 @@ class UnitTypesCompanion extends UpdateCompanion<UnitType> {
   final Value<String> kind;
   final Value<int> rentKes;
   final Value<int?> depositKes;
+  final Value<String> amenities;
   final Value<int> rowid;
   const UnitTypesCompanion({
     this.id = const Value.absent(),
@@ -1319,6 +1355,7 @@ class UnitTypesCompanion extends UpdateCompanion<UnitType> {
     this.kind = const Value.absent(),
     this.rentKes = const Value.absent(),
     this.depositKes = const Value.absent(),
+    this.amenities = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   UnitTypesCompanion.insert({
@@ -1330,6 +1367,7 @@ class UnitTypesCompanion extends UpdateCompanion<UnitType> {
     required String kind,
     required int rentKes,
     this.depositKes = const Value.absent(),
+    this.amenities = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        buildingId = Value(buildingId),
@@ -1344,6 +1382,7 @@ class UnitTypesCompanion extends UpdateCompanion<UnitType> {
     Expression<String>? kind,
     Expression<int>? rentKes,
     Expression<int>? depositKes,
+    Expression<String>? amenities,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1355,6 +1394,7 @@ class UnitTypesCompanion extends UpdateCompanion<UnitType> {
       if (kind != null) 'kind': kind,
       if (rentKes != null) 'rent_kes': rentKes,
       if (depositKes != null) 'deposit_kes': depositKes,
+      if (amenities != null) 'amenities': amenities,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1368,6 +1408,7 @@ class UnitTypesCompanion extends UpdateCompanion<UnitType> {
     Value<String>? kind,
     Value<int>? rentKes,
     Value<int?>? depositKes,
+    Value<String>? amenities,
     Value<int>? rowid,
   }) {
     return UnitTypesCompanion(
@@ -1379,6 +1420,7 @@ class UnitTypesCompanion extends UpdateCompanion<UnitType> {
       kind: kind ?? this.kind,
       rentKes: rentKes ?? this.rentKes,
       depositKes: depositKes ?? this.depositKes,
+      amenities: amenities ?? this.amenities,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1412,6 +1454,9 @@ class UnitTypesCompanion extends UpdateCompanion<UnitType> {
     if (depositKes.present) {
       map['deposit_kes'] = Variable<int>(depositKes.value);
     }
+    if (amenities.present) {
+      map['amenities'] = Variable<String>(amenities.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1429,6 +1474,7 @@ class UnitTypesCompanion extends UpdateCompanion<UnitType> {
           ..write('kind: $kind, ')
           ..write('rentKes: $rentKes, ')
           ..write('depositKes: $depositKes, ')
+          ..write('amenities: $amenities, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2990,6 +3036,7 @@ typedef $$UnitTypesTableCreateCompanionBuilder =
       required String kind,
       required int rentKes,
       Value<int?> depositKes,
+      Value<String> amenities,
       Value<int> rowid,
     });
 typedef $$UnitTypesTableUpdateCompanionBuilder =
@@ -3002,6 +3049,7 @@ typedef $$UnitTypesTableUpdateCompanionBuilder =
       Value<String> kind,
       Value<int> rentKes,
       Value<int?> depositKes,
+      Value<String> amenities,
       Value<int> rowid,
     });
 
@@ -3054,6 +3102,11 @@ class $$UnitTypesTableFilterComposer
     column: $table.depositKes,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<String> get amenities => $composableBuilder(
+    column: $table.amenities,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$UnitTypesTableOrderingComposer
@@ -3104,6 +3157,11 @@ class $$UnitTypesTableOrderingComposer
     column: $table.depositKes,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get amenities => $composableBuilder(
+    column: $table.amenities,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$UnitTypesTableAnnotationComposer
@@ -3145,6 +3203,9 @@ class $$UnitTypesTableAnnotationComposer
     column: $table.depositKes,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get amenities =>
+      $composableBuilder(column: $table.amenities, builder: (column) => column);
 }
 
 class $$UnitTypesTableTableManager
@@ -3183,6 +3244,7 @@ class $$UnitTypesTableTableManager
                 Value<String> kind = const Value.absent(),
                 Value<int> rentKes = const Value.absent(),
                 Value<int?> depositKes = const Value.absent(),
+                Value<String> amenities = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => UnitTypesCompanion(
                 id: id,
@@ -3193,6 +3255,7 @@ class $$UnitTypesTableTableManager
                 kind: kind,
                 rentKes: rentKes,
                 depositKes: depositKes,
+                amenities: amenities,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3205,6 +3268,7 @@ class $$UnitTypesTableTableManager
                 required String kind,
                 required int rentKes,
                 Value<int?> depositKes = const Value.absent(),
+                Value<String> amenities = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => UnitTypesCompanion.insert(
                 id: id,
@@ -3215,6 +3279,7 @@ class $$UnitTypesTableTableManager
                 kind: kind,
                 rentKes: rentKes,
                 depositKes: depositKes,
+                amenities: amenities,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
