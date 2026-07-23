@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
@@ -60,14 +62,18 @@ class CaptureRepository {
     required String kind,
     required int rentKes,
     int? depositKes,
+    Set<String> amenities = const {},
   }) async {
     final id = _uuid.v4();
+    // Stored as a flag map ({"wifi": true}) to match the server's JSONB dict.
+    final amenityMap = {for (final a in amenities) a: true};
     await _db.upsertUnitType(UnitTypesCompanion.insert(
       id: id,
       buildingId: buildingId,
       kind: kind,
       rentKes: rentKes,
       depositKes: Value(depositKes),
+      amenities: Value(jsonEncode(amenityMap)),
     ));
     return id;
   }

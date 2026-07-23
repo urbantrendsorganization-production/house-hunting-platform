@@ -101,6 +101,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
           kind: u.kind,
           rentKes: rent,
           depositKes: int.tryParse(u.deposit.text.trim()),
+          amenities: u.amenities,
         );
         await repo.addVacancy(
           unitTypeId: unitId,
@@ -336,6 +337,17 @@ class _UnitRow extends StatelessWidget {
 
   static const _kinds = ['BEDSITTER', '1BR', '2BR', '3BR', 'SINGLE'];
 
+  // Unit-level amenities: slug (sent to the API as a flag map) → display label.
+  static const _amenities = <String, String>{
+    'wifi': 'WiFi',
+    'water_included': 'Water incl.',
+    'hot_shower': 'Hot shower',
+    'tiled': 'Tiled',
+    'balcony': 'Balcony',
+    'master_ensuite': 'Master ensuite',
+    'furnished': 'Furnished',
+  };
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -398,6 +410,26 @@ class _UnitRow extends StatelessWidget {
                         labelText: 'Vacant', border: OutlineInputBorder()),
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                for (final entry in _amenities.entries)
+                  FilterChip(
+                    label: Text(entry.value),
+                    selected: draft.amenities.contains(entry.key),
+                    onSelected: (on) {
+                      if (on) {
+                        draft.amenities.add(entry.key);
+                      } else {
+                        draft.amenities.remove(entry.key);
+                      }
+                      onChanged();
+                    },
+                  ),
               ],
             ),
           ],
@@ -465,6 +497,7 @@ class _UnitDraft {
   final rent = TextEditingController();
   final deposit = TextEditingController();
   final vacant = TextEditingController(text: '1');
+  final Set<String> amenities = {};
 
   void dispose() {
     rent.dispose();

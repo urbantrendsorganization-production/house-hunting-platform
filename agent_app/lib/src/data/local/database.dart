@@ -47,6 +47,9 @@ class UnitTypes extends Table with _Syncable {
   TextColumn get kind => text()(); // BEDSITTER / 1BR / 2BR / ...
   IntColumn get rentKes => integer()();
   IntColumn get depositKes => integer().nullable()();
+  // JSON-encoded amenity flag map, e.g. {"wifi": true}. The API stores this as a
+  // JSONB dict and consumer surfaces render it, so we capture it here at source.
+  TextColumn get amenities => text().withDefault(const Constant('{}'))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -80,7 +83,19 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  // v2 adds UnitTypes.amenities. An in-field install may already hold un-synced
+  // captures, so we add the column in place rather than wipe the queue.
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.addColumn(unitTypes, unitTypes.amenities);
+          }
+        },
+      );
 
   // --- Reads ---
 
