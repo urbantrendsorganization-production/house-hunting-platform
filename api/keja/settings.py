@@ -183,6 +183,15 @@ LOGGING = {
             "level": env("DB_LOG_LEVEL", default="WARNING"),
             "propagate": False,
         },
+        # A public API domain gets constant junk probes (adware scripts like
+        # /js/lkk_ch.js, root hits from spoofed mobile UAs). Django logs every
+        # unmatched URL as a WARNING "Not Found", which is pure noise. Raise this
+        # logger to ERROR so real 5xx still surface but 4xx probes stay quiet.
+        "django.request": {
+            "handlers": ["console"],
+            "level": env("REQUEST_LOG_LEVEL", default="ERROR"),
+            "propagate": False,
+        },
     },
 }
 
